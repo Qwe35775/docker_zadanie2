@@ -45,12 +45,12 @@ jobs:
         id: scan
         run: |
           docker scout quickview docker.io/qwe357/zad2:${{ github.sha }}
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Tag Docker image with new tag
-        if: steps.scan.outcome == 'success'
+        if: success()
         run: docker tag docker.io/qwe357/zad2:${{ github.sha }} docker.io/qwe357/zad2:succeed
         
       - name: Push the Docker image
-        if: steps.scan.outcome == 'success'
+        if: success()
         run: docker image push docker.io/qwe357/zad2:succeed
