@@ -1,4 +1,4 @@
-name: GHAction example  
+name: GHAction zad2  
 
 on:
   workflow_dispatch:
@@ -10,22 +10,22 @@ jobs:
   ci_step:
     name: Build, tag and push Docker image to DockerHub
     runs-on: ubuntu-latest
-      
+
     steps:
       - 
         name: Check out the source_repo
         uses: actions/checkout@v4
-      
+
       -
         name: Docker metadata definitions
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ vars.DOCKERHUB_USERNAME }}/example
+          images: ${{ vars.DOCKERHUB_USERNAME }}/zad2
           flavor: latest=false
           tags: |
             type=sha,priority=100,prefix=sha-,format=short
-            type=semver,priority=200,pattern={{version}}   
+            type=semver,priority=200,pattern={{version}} 
 
       - 
         name: QEMU set-up
@@ -42,35 +42,26 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # - 
-      #   name: Build and push Docker image
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     file: ./Dockerfile
-      #     platforms: linux/amd64,linux/arm64
-      #     push: true
-      #     cache-from: |
-      #       type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/example:cache 
-      #     cache-to: |
-      #       type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/example:cache  
-      #     tags: ${{ steps.meta.outputs.tags }}
-      - name: Build an image from Dockerfile
-        run: |
-          docker build -t docker.io/qwe357/example:${{ github.sha }} .
-      - name: Scan Docker image with Trivy
-        id: scan
-        uses: aquasecurity/trivy-action@master
+      - 
+        name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-            image-ref: 'docker.io/qwe357/example:${{ github.sha }}'
-            severity: CRITICAL,HIGH
-            exit-code: 1
-            format: table
-            ignore-unfixed: true
-      - name: Tag Docker image with new tag
-        if: steps.scan.outputs.exit-code == 0
-        run: docker tag docker.io/qwe357/example:${{ github.sha }} docker.io/qwe357/example:succeed
-        
-      - name: Push the Docker image
-        if: steps.scan.outputs.exit-code == 0
-        run: docker image push docker.io/qwe357/example:succeed
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: |
+            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/zad2:cache 
+          cache-to: |
+            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/zad2:cache  
+          tags: ${{ steps.meta.outputs.sha }}
+
+
+      - name: Scan Docker image for vulnerabilities with Docker Scout
+        run: |
+          docker scout cves ${{ vars.DOCKERHUB_USERNAME }}/zad2:${{ steps.meta.outputs.sha }} --exit-code 1 --only-severity critical,high
+
+      - name: Push scan results to GitHub
+        if: success()  # Only if scanning is successful
+        run: |
+          echo "Scan successful, pushing to GitHub"
