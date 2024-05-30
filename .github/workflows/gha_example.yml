@@ -43,16 +43,26 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - 
-        name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        name: Build an image from Dockerfile
+        run: |
+          docker build -t docker.io/qwe357/zad2:${{ github.sha }} .
+
+      - 
+        name: Scan Docker image with Trivy
+        id: scan
+        uses: aquasecurity/trivy-action@master
         with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          cache-from: |
-            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/example:cache 
-          cache-to: |
-            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/example:cache  
-          tags: ${{ steps.meta.outputs.tags }}
-      
+            image-ref: 'docker.io/qwe357/zad2:${{ github.sha }}'
+            severity: CRITICAL,HIGH
+            exit-code: 1
+            format: table
+            ignore-unfixed: true
+            
+      - 
+        name: Tag Docker image with new tag
+        if: steps.scan.outputs.exit-code == 0
+        run: docker tag docker.io/qwe357/zad2:${{ github.sha }} docker.io/qwe357/zad2:succeed
+        
+      - name: Push the Docker image
+        if: steps.scan.outputs.exit-code == 0
+        run: docker image push docker.io/qwe357/zad2:succeed
