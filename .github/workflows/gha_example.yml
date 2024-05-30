@@ -1,4 +1,4 @@
-name: GHAction example  
+name: GHAction zad2  
 
 on:
   workflow_dispatch:
@@ -21,7 +21,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ vars.DOCKERHUB_USERNAME }}/example
+          images: ${{ vars.DOCKERHUB_USERNAME }}/zad2
           flavor: latest=false
           tags: |
             type=sha,priority=100,prefix=sha-,format=short
@@ -46,9 +46,7 @@ jobs:
         name: Build an image from Dockerfile
         run: |
           docker build -t docker.io/qwe357/zad2:${{ github.sha }} .
-
-      - 
-        name: Scan Docker image with Trivy
+      - name: Scan Docker image with Trivy
         id: scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -57,12 +55,11 @@ jobs:
             exit-code: 1
             format: table
             ignore-unfixed: true
-            
-      - 
-        name: Tag Docker image with new tag
+      - name: Tag Docker image with new tag
         if: steps.scan.outputs.exit-code == 0
         run: docker tag docker.io/qwe357/zad2:${{ github.sha }} docker.io/qwe357/zad2:succeed
         
       - name: Push the Docker image
         if: steps.scan.outputs.exit-code == 0
         run: docker image push docker.io/qwe357/zad2:succeed
+      
