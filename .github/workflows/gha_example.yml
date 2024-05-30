@@ -1,4 +1,4 @@
-name: GHAction zad2  
+name: GHAction example  
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   ci_step:
-    name: Build, tag, test and push Docker image
+    name: Build, tag and push Docker image to DockerHub
     runs-on: ubuntu-latest
       
     steps:
@@ -21,7 +21,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ vars.DOCKERHUB_USERNAME }}/zad2
+          images: ${{ vars.DOCKERHUB_USERNAME }}/example
           flavor: latest=false
           tags: |
             type=sha,priority=100,prefix=sha-,format=short
@@ -42,50 +42,35 @@ jobs:
           username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - 
-        name: Build Docker image
-        uses: docker/build-push-action@v5
-        id: build
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: false  # Build image but do not push yet
-          cache-from: |
-            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/zad2:cache 
-          cache-to: |
-            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/zad2:cache  
-          tags: ${{ steps.meta.outputs.tags }}
-
-      - 
-        name: Scan Docker image for vulnerabilities
-        uses: docker/scout-action@v1
-        with:
-          image: ${{ vars.DOCKERHUB_USERNAME }}/zad2:latest
-          command: cves
-        
-
-      - 
-        name: Check for critical or high vulnerabilities
+      # - 
+      #   name: Build and push Docker image
+      #   uses: docker/build-push-action@v5
+      #   with:
+      #     context: .
+      #     file: ./Dockerfile
+      #     platforms: linux/amd64,linux/arm64
+      #     push: true
+      #     cache-from: |
+      #       type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/example:cache 
+      #     cache-to: |
+      #       type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/example:cache  
+      #     tags: ${{ steps.meta.outputs.tags }}
+      - name: Build an image from Dockerfile
         run: |
-          critical_count=$(jq '.summary.critical' < scan-results.json)
-          high_count=$(jq '.summary.high' < scan-results.json)
-          if [ "$critical_count" -ne "0" ] || [ "$high_count" -ne "0" ]; then
-            echo "Image contains critical or high vulnerabilities. Failing the build."
-            exit 1
-          fi
-
-      - 
-        name: Push Docker image to DockerHub
-        if: success()  # Only push if the scan passes
-        uses: docker/build-push-action@v5
+          docker build -t docker.io/qwe357/example:${{ github.sha }} .
+      - name: Scan Docker image with Trivy
+        id: scan
+        uses: aquasecurity/trivy-action@master
         with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64,linux/arm64
-          push: true
-          cache-from: |
-            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/zad2:cache 
-          cache-to: |
-            type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/zad2:cache  
-          tags: ${{ steps.meta.outputs.tags }}
+            image-ref: 'docker.io/qwe357/example:${{ github.sha }}'
+            severity: CRITICAL,HIGH
+            exit-code: 1
+            format: table
+            ignore-unfixed: true
+      - name: Tag Docker image with new tag
+        if: steps.scan.outputs.exit-code == 0
+        run: docker tag docker.io/qwe357/example:${{ github.sha }} docker.io/qwe357/example:succeed
+        
+      - name: Push the Docker image
+        if: steps.scan.outputs.exit-code == 0
+        run: docker image push docker.io/qwe357/example:succeed
